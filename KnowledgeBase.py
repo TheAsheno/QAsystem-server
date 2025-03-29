@@ -4,14 +4,12 @@ import os
 
 class KnowledgeBase:
     def __init__(self, embedding_model):
+        self.course = None
         self.embedding = HuggingFaceEmbeddings(model_name=embedding_model)
         self.retriever = None
 
-    def load_vectorstore(self, course):
-        """
-        加载指定课程的向量存储
-        """
-        base_path = f"./vectorstore/{course}"
+    def load_vectorstore(self):
+        base_path = f"./vectorstore/{self.course}"
         if os.path.exists(base_path):
             db = None
             for file in os.listdir(base_path):
@@ -30,10 +28,10 @@ class KnowledgeBase:
         else:
             self.retriever = None
 
-    def retrieve_documents(self, question):
-        """
-        使用向量检索获取相关文档
-        """
+    def retrieve_documents(self, course, question):
+        if not self.course or self.course != course:
+            self.course = course
+            self.load_vectorstore()
         if not self.retriever:
             return []
         return self.retriever.invoke(question)

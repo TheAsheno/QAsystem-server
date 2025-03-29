@@ -30,16 +30,7 @@ def ask():
     if not question:
         return jsonify({"error": "Question is required"}), 400
     try:
-        if not rag.course or rag.course != course:
-            rag.course = course
-            rag.initial_rag()
-        context = ""
-        if rag.retriever:
-            context = rag.combine_documents(rag.retriever.invoke(question))
-        result = rag.chain.invoke({
-            "question": question,
-            "context": context
-        })
+        result, context = rag.answer_question(course, question)
         return jsonify({
             "answer": result,
             "context": context
