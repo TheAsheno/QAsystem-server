@@ -25,13 +25,13 @@ class KnowledgeGraph:
                 """
                 CALL db.index.fulltext.queryNodes('entity', $query, {limit:2})
                 YIELD node, score
-                CALL {
+                CALL (node) {
                     WITH node
-                    MATCH (node)-[r*1..$hops]->(neighbor)
+                    MATCH (node)-[r]->(neighbor)
                     RETURN node AS current_node, r AS relationship, neighbor AS neighbor_node
                     UNION ALL
                     WITH node
-                    MATCH (node)<-[r*1..$hops]-(neighbor)
+                    MATCH (node)<-[r]-(neighbor)
                     RETURN neighbor AS current_node, r AS relationship, node AS neighbor_node
                 }
                 RETURN current_node, relationship, neighbor_node

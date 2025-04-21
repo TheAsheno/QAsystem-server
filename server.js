@@ -71,7 +71,7 @@ const Student = sequelize.define('Student', {
   },
   nickname: {
     type: DataTypes.STRING,
-    allowNull: false
+    allowNull: true
   },
   avatar: {
     type: DataTypes.STRING,
@@ -256,7 +256,11 @@ const Knowledge = sequelize.define('Knowledge', {
   relations: {
     type: DataTypes.TEXT,
     allowNull: true
-  }
+  },
+  isKb: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false
+  },
 }, {
   tableName: 'Knowledge'
 });
@@ -298,6 +302,36 @@ const Notification = sequelize.define('Notification', {
   tableName: 'Notification'
 });
 
+const Favorite = sequelize.define('Favorite', {
+  favoriteid: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  studentid: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'Student',
+      key: 'userid'
+    },
+    onDelete: 'NO ACTION',
+    onUpdate: 'NO ACTION'
+  },
+  questionid: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'Question',
+      key: 'questionid'
+    },
+    onDelete: 'NO ACTION',
+    onUpdate: 'NO ACTION'
+  }
+}, {
+  tableName: 'Favorite'
+});
+
 // 定义模型之间的关系
 Teacher.hasMany(Course, { foreignKey: 'teacherid' });
 Course.belongsTo(Teacher, { foreignKey: 'teacherid' });
@@ -331,6 +365,15 @@ Student.hasMany(Notification, { foreignKey: 'receiverid', constraints: false });
 
 Notification.belongsTo(Teacher, { foreignKey: 'receiverid', constraints: false });
 Teacher.hasMany(Notification, { foreignKey: 'receiverid', constraints: false });
+
+Favorite.belongsTo(Question, { foreignKey: 'questionid' });
+Question.hasMany(Favorite, { foreignKey: 'questionid' });
+
+Favorite.belongsTo(Student, { foreignKey: 'studentid' });
+Student.hasMany(Favorite, { foreignKey: 'studentid' });
+
+Student.belongsToMany(Question, { through: Favorite, foreignKey: 'studentid' });
+Question.belongsToMany(Student, { through: Favorite, foreignKey: 'questionid' });
 
 // 同步所有模型
 sequelize.sync({ alter: true }).then(() => {
@@ -588,7 +631,6 @@ app.delete('/api/upload', async (req, res) => {
   }
 });
 
-
 // 增加 question
 app.post('/api/questions', async (req, res) => {
   try {
@@ -840,7 +882,8 @@ app.post('/api/knowledge/upload', upload.single('file'), async (req, res) => {
       filename: filename,
       size: file.size,
       type: type,
-      path: file.path
+      path: file.path,
+      isKb: isKb === 'true'
     });
     if (isKb == 'true') {
       const base_path = path.join('vectorstore', courseid.toString());
@@ -1056,6 +1099,83 @@ app.delete('/api/notifications', async (req, res) => {
   }
 });
 
+// 收藏问题
+app.post('/api/favorites', async (req, res) => {
+  const { studentid, questionid } = req.body;
+  try {
+    const existingFavorite = await Favorite.findOne({
+      where: { studentid, questionid }
+    });
+    if (existingFavorite) {
+      return res.status(400).json({ message: 'Question already favorited' });
+    }
+    const favorite = await Favorite.create({ studentid, questionid });
+    res.status(200).json(favorite);
+  } catch (err) {
+    console.error('Error adding favorite:', err);
+    res.status(400).json({ message: 'Internal server error' });
+  }
+});
+
+// 删除收藏
+app.delete('/api/favorites/:favoriteid', async (req, res) => {
+  const { favoriteid } = req.params;
+  try {
+    const deleted = await Favorite.destroy({
+      where: { favoriteid, favoriteid }
+    });
+    if (deleted) {
+      res.status(200).json({ message: 'Favorite removed successfully' });
+    } else {
+      res.status(404).json({ message: 'Favorite not found' });
+    }
+  } catch (err) {
+    console.error('Error removing favorite:', err);
+    res.status(400).json({ message: 'Internal server error' });
+  }
+});
+
+// 获取收藏列表
+app.get('/api/favorites', async (req, res) => {
+  const { studentid, questionid } = req.query;
+  try {
+    const whereClause = {};
+    if (studentid) {
+      whereClause.studentid = studentid;
+    }
+    if (questionid) {
+      whereClause.questionid = questionid;
+    }
+    const favorites = await Favorite.findAll({
+      where: whereClause,
+      include: [{
+        model: Question,
+        attributes: ['questionid', 'title', 'content', 'tags', 'images'],
+        include: [{
+          model: Student,
+          attributes: ['username', 'nickname', 'avatar']
+        }, {
+          model: Course,
+          attributes: ['courseid', 'coursename'],
+        }]
+      }]
+    });
+    const parsedFavorites = favorites.map(favorite => {
+      const question = favorite.Question;
+      question.tags = question.tags ? JSON.parse(question.tags) : [];
+      question.images = question.images ? JSON.parse(question.images) : [];
+      return {
+        ...favorite.toJSON(),
+        Question: question
+      };
+    });
+    res.status(200).json(parsedFavorites);
+  } catch (err) {
+    console.error('Error fetching favorites:', err);
+    res.status(400).json({ message: 'Internal server error' });
+  }
+});
+
 // 登录接口
 app.post('/api/users/login', async (req, res) => {
   const { userid, password } = req.body;
@@ -1084,7 +1204,6 @@ app.post('/api/users/register', async (req, res) => {
     } else {
       return res.status(400).json({ message: 'Invalid role' });
     }
-
     res.status(200).json({ message: 'Registration successful', user });
   } catch (err) {
     console.error('Error during registration:', err);
@@ -1115,7 +1234,7 @@ cron.schedule('0 * * * *', async () => {
 });
 
 // 启动服务器
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.SQL_PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from RAG import RAG
 import os
 from dotenv import load_dotenv
@@ -9,6 +10,7 @@ api_url = os.getenv("OPENAI_API_URL")
 uri = os.getenv("NEO4J_URI")
 username = os.getenv("NEO4J_USERNAME")
 password = os.getenv("NEO4J_PASSWORD")
+sql_port = os.getenv("SQL_PORT")
 model = "deepseek-chat"
 llm_params = {
     "model": model,
@@ -18,9 +20,10 @@ llm_params = {
 }
 embedding_model = "bge-large-zh-v1.5"
 
-rag = RAG(llm_params, embedding_model, uri, username, password)
+rag = RAG(llm_params, embedding_model, uri, username, password, sql_port)
 
 app = Flask(__name__)
+CORS(app)
 
 @app.route("/ask", methods=["POST"])
 def ask():
@@ -30,16 +33,18 @@ def ask():
     if not question:
         return jsonify({"error": "Question is required"}), 400
     try:
-        result, context = rag.answer_question(course, question)
+        result, kb_context, kg_context, related_questions = rag.answer_question(course, question)
         return jsonify({
-            "answer": result,
-            "context": context
+            "content": result,
+            "kb_context": kb_context,
+            "kg_context": kg_context,
+            "related_questions": related_questions
         })
     except Exception as e:
         print(f"处理请求时出错: {str(e)}")
         return jsonify({"error": str(e)}), 500
     
-app.run(host="0.0.0.0", port=5000)
+app.run(host="0.0.0.0", port=7000, debug=True)
 
 
 
