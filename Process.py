@@ -1,6 +1,7 @@
 from langchain_community.embeddings import HuggingFaceEmbeddings
+from Model import SharedModel
 from langchain_text_splitters import MarkdownHeaderTextSplitter, CharacterTextSplitter
-from langchain_community.document_loaders import TextLoader, PDFMinerLoader
+from langchain_community.document_loaders import TextLoader, PDFMinerLoader, UnstructuredWordDocumentLoader
 from langchain_community.vectorstores import FAISS
 import os
 import sys
@@ -9,7 +10,7 @@ class Processor:
     def __init__(self, base_path, file_path):
         self.base_path = base_path
         self.file_path = file_path
-        self.embedding = HuggingFaceEmbeddings(model_name='bge-large-zh-v1.5')
+        self.embedding = SharedModel.get_embedding_model()
         self._load_content()
         self._setup_embeddings()
 
@@ -24,6 +25,7 @@ class Processor:
             self.loader = PDFMinerLoader(self.file_path)
             self._parse_pdf()
         elif ext == ".docx":
+            self.loader = UnstructuredWordDocumentLoader(self.file_path)
             self._parse_docx()
         else:
             raise ValueError(f"Unsupported file type: {ext}")
@@ -44,13 +46,15 @@ class Processor:
         text_splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         self.split_docs = text_splitter.split_documents(docs)
 
-    def _parse_pdf(self, chunk_size=200, chunk_overlap=20):
+    def _parse_pdf(self):
+        docs = self.loader.load()
+        text_splitter = CharacterTextSplitter()
+        self.split_docs = text_splitter.split_documents(docs)
+
+    def _parse_docx(self, chunk_size=500, chunk_overlap=50):
         docs = self.loader.load()
         text_splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-        self.split_docs = text_splitter.split_text(docs)
-
-    def _parse_docx(self):
-        pass
+        self.split_docs = text_splitter.split_documents(docs)
 
     def _setup_embeddings(self):
         if not os.path.exists(self.base_path):

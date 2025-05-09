@@ -15,6 +15,7 @@ app.use(bodyParser.json());
 
 // 提供静态文件服务
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/images', express.static('E:/neo4j-chs-community-5.26.0-windows/images/'));
 
 // 连接 SQL Server
 const sequelize = new Sequelize('QAsystem', 'sa', '252011', {

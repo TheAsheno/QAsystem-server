@@ -1,11 +1,11 @@
 from sklearn.metrics.pairwise import cosine_similarity
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from Model import SharedModel
 import requests
 
 class QuestionBase:
-    def __init__(self, sql_port, embedding_model):
+    def __init__(self, sql_port):
         self.sql_url = f"http://localhost:{sql_port}"
-        self.embedding = HuggingFaceEmbeddings(model_name=embedding_model)
+        self.embedding = SharedModel.get_embedding_model()
 
     def search(self, course_id, question_text):
         related_questions = self.get_related_questions(course_id, question_text)

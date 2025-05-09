@@ -20,7 +20,7 @@ llm_params = {
 }
 embedding_model = "bge-large-zh-v1.5"
 
-rag = RAG(llm_params, embedding_model, uri, username, password, sql_port)
+rag = RAG(llm_params, uri, username, password, sql_port)
 
 app = Flask(__name__)
 CORS(app)
@@ -33,11 +33,11 @@ def ask():
     if not question:
         return jsonify({"error": "Question is required"}), 400
     try:
-        result, kb_context, kg_context, related_questions = rag.answer_question(course, question)
+        result, kb_context, graph, related_questions = rag.answer_question(course, question)
         return jsonify({
             "content": result,
             "kb_context": kb_context,
-            "kg_context": kg_context,
+            "graph": graph,
             "related_questions": related_questions
         })
     except Exception as e:

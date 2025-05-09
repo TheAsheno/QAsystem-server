@@ -1,11 +1,11 @@
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from Model import SharedModel
 import os
 
 class KnowledgeBase:
-    def __init__(self, embedding_model):
+    def __init__(self):
         self.course = None
-        self.embedding = HuggingFaceEmbeddings(model_name=embedding_model)
+        self.embedding = SharedModel.get_embedding_model()
         self.retriever = None
 
     def load_vectorstore(self):
